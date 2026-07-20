@@ -1,0 +1,44 @@
+{
+  "_note": "PLACEHOLDER DATA. Replace with your real, reviewed question set. Structure: session -> list of {category, difficulty, text}. Categories: warm_up, motivation_fit, behavioral_pbdi, self_reflection, closing. Sessions increase in difficulty 1->5.",
+
+  "session_1": [
+    {"category": "warm_up", "difficulty": 1, "text": "ספר לי קצת על עצמך."},
+    {"category": "motivation_fit", "difficulty": 1, "text": "למה אתה מעוניין בסוג התפקיד הזה?"},
+    {"category": "behavioral_pbdi", "difficulty": 1, "text": "ספר לי על פעם שעבדת בצוות."},
+    {"category": "self_reflection", "difficulty": 1, "text": "מה נחשב אצלך ליתרון בעבודה?"},
+    {"category": "self_reflection", "difficulty": 1, "text": "מה נחשב אצלך לתחום לשיפור?"},
+    {"category": "closing", "difficulty": 1, "text": "יש לך שאלות אליי?"}
+  ],
+  "session_2": [
+    {"category": "warm_up", "difficulty": 2, "text": "מה משך אותך לתחום הזה?"},
+    {"category": "motivation_fit", "difficulty": 2, "text": "מה אתה מחפש בסביבת עבודה?"},
+    {"category": "behavioral_pbdi", "difficulty": 2, "text": "ספר לי על מצב שבו היה לך חילוקי דעות עם מישהו בעבודה."},
+    {"category": "behavioral_pbdi", "difficulty": 2, "text": "ספר לי על משימה שהייתה מאתגרת עבורך."},
+    {"category": "self_reflection", "difficulty": 2, "text": "איך אתה מתמודד עם לחץ בעבודה?"},
+    {"category": "closing", "difficulty": 2, "text": "מה חשוב לך לדעת על התפקיד הזה?"}
+  ],
+  "session_3": [
+    {"category": "warm_up", "difficulty": 3, "text": "מה היה הפרויקט המשמעותי ביותר שעבדת עליו?"},
+    {"category": "motivation_fit", "difficulty": 3, "text": "איך התפקיד הזה מתחבר למטרות שלך לטווח ארוך?"},
+    {"category": "behavioral_pbdi", "difficulty": 3, "text": "ספר לי על פעם שהובלת משהו, גם אם לא היה לך תפקיד רשמי של מוביל."},
+    {"category": "behavioral_pbdi", "difficulty": 3, "text": "ספר לי על טעות שעשית ואיך התמודדת איתה."},
+    {"category": "self_reflection", "difficulty": 3, "text": "איך אתה מתעדף כשיש לך כמה משימות במקביל?"},
+    {"category": "closing", "difficulty": 3, "text": "מה יגרום לך להרגיש שהצלחת בתפקיד הזה?"}
+  ],
+  "session_4": [
+    {"category": "warm_up", "difficulty": 4, "text": "מה שינית בגישה שלך לעבודה בשנה האחרונה?"},
+    {"category": "motivation_fit", "difficulty": 4, "text": "מה מבדל אותך ממועמדים אחרים לתפקיד הזה?"},
+    {"category": "behavioral_pbdi", "difficulty": 4, "text": "ספר לי על מצב שבו קיבלת משוב קשה. איך הגבת?"},
+    {"category": "behavioral_pbdi", "difficulty": 4, "text": "ספר לי על החלטה מקצועית שלא היית בטוח לגביה."},
+    {"category": "self_reflection", "difficulty": 4, "text": "איך אתה יודע מתי משימה הושלמה טוב?"},
+    {"category": "closing", "difficulty": 4, "text": "תאר מצב עבודה טכני או מקצועי שהיית רוצה לפתור.", "open_channel": true}
+  ],
+  "session_5": [
+    {"category": "warm_up", "difficulty": 5, "text": "איך היית מתאר את סגנון העבודה שלך למישהו שלא מכיר אותך?"},
+    {"category": "motivation_fit", "difficulty": 5, "text": "איפה אתה רואה את עצמך מתפתח בתחום הזה?"},
+    {"category": "behavioral_pbdi", "difficulty": 5, "text": "ספר לי על פעם שהיית צריך לשכנע מישהו שחשב אחרת ממך."},
+    {"category": "behavioral_pbdi", "difficulty": 5, "text": "ספר לי על תקופה עמוסה במיוחד ואיך ניהלת אותה."},
+    {"category": "self_reflection", "difficulty": 5, "text": "מה למדת על עצמך מתהליך החיפוש הזה?"},
+    {"category": "closing", "difficulty": 5, "text": "תאר בעיה טכנית או מקצועית מורכבת ואיך היית ניגש אליה.", "open_channel": true}
+  ]
+}
