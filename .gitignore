@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 data/review_queue.jsonl
 data/run_log.jsonl
+results/
