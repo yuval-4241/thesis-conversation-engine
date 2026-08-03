@@ -13,7 +13,9 @@ is a hard requirement, see guardrail.py).
 - Demo: Streamlit
 
 ## Files already built (do not redesign, extend only)
-- `config.py` — VA matrix, personas, no-masking patterns, model names
+- `config.py` — VA matrix, no-masking patterns, model names
+- `prompts/` — all prompt/persona text (persona_prompts.py, evaluator_prompt.py);
+  prompts no longer live in config.py or inline in modules
 - `llm_client.py` — provider abstraction, ALL llm calls go through `call_llm()`
 - `personas.py` — synthetic candidate generator (#8)
 - `evaluator.py` — GOOD/NEUTRAL/BAD + VA classifier (#2)

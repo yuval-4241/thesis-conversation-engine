@@ -9,8 +9,8 @@ equal information content, that's evidence of style bias to fix in #2/#5.
 """
 
 from dataclasses import dataclass
-import config
 import llm_client
+from prompts.persona_prompts import PERSONAS, PERSONA_SYSTEM_TEMPLATE
 
 
 @dataclass
@@ -20,20 +20,12 @@ class SyntheticAnswer:
     answer_text: str
 
 
-PERSONA_SYSTEM_TEMPLATE = """You are simulating a job interview candidate for a research study.
-Persona style: {persona_description}
-
-Answer the interview question in-character. Respond ONLY with the candidate's
-spoken answer — no meta-commentary, no labels. Keep it realistic in length
-for a spoken interview answer (2-6 sentences unless the persona is minimal)."""
-
-
 def generate_synthetic_answer(persona_key: str, question: str) -> SyntheticAnswer:
-    if persona_key not in config.PERSONAS:
+    if persona_key not in PERSONAS:
         raise ValueError(f"Unknown persona: {persona_key}")
 
     system = PERSONA_SYSTEM_TEMPLATE.format(
-        persona_description=config.PERSONAS[persona_key]
+        persona_description=PERSONAS[persona_key]
     )
     text = llm_client.call_llm(
         system=system,
