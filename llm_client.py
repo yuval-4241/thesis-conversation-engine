@@ -22,15 +22,22 @@ _client = None
 def get_client() -> OpenAI:
     global _client
     if _client is None:
-        if not config.LAB_LLM_TOKEN:
-            raise RuntimeError(
-                "LAB_LLM_TOKEN not set. Run: export LAB_LLM_TOKEN='your_token' "
-                "(see .env.example)"
+        if config.LLM_PROVIDER == "openai":
+            if not config.OPENAI_API_KEY:
+                raise RuntimeError(
+                    "OPENAI_API_KEY not set. Add it to .env (see .env.example)."
+                )
+            _client = OpenAI(api_key=config.OPENAI_API_KEY)
+        else:
+            if not config.LAB_LLM_TOKEN:
+                raise RuntimeError(
+                    "LAB_LLM_TOKEN not set. Run: export LAB_LLM_TOKEN='your_token' "
+                    "(see .env.example)"
+                )
+            _client = OpenAI(
+                base_url=config.LAB_LLM_BASE_URL,
+                api_key=config.LAB_LLM_TOKEN,
             )
-        _client = OpenAI(
-            base_url=config.LAB_LLM_BASE_URL,
-            api_key=config.LAB_LLM_TOKEN,
-        )
     return _client
 
 

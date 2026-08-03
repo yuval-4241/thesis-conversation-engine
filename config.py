@@ -6,15 +6,26 @@ Combines pieces #8 (synthetic personas), #2 (evaluator), #5 (no-masking guardrai
 
 import os
 
-# ── LLM settings — Lab GPU server (OpenAI-compatible) ──────────────────────
+# ── LLM settings ────────────────────────────────────────────────────────────
+# LLM_PROVIDER selects which backend llm_client.get_client() talks to.
+# "lab" (default) = lab GPU server. "openai" = OpenAI's API directly —
+# used when the lab server is unreachable/busy.
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "lab")
+
 LAB_LLM_BASE_URL = "http://100.110.96.82:8000/v1"
 LAB_LLM_TOKEN = os.environ.get("LAB_LLM_TOKEN", "")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 # Model choice: start fast/cheap while building, move up once quality matters.
 # For Hebrew response generation later, consider dictalm3-12b / dictalm3-24b.
-MODEL_FAST = "llama3.1-8b"      # quick loop while building/debugging
-MODEL_DEFAULT = "gpt-oss-20b"   # good speed/quality tradeoff — use this by default
-MODEL_HEBREW = "dictalm3-12b"   # for Hebrew-heavy tasks later (response bank, personas)
+if LLM_PROVIDER == "openai":
+    MODEL_FAST = "gpt-4o-mini"
+    MODEL_DEFAULT = "gpt-4o-mini"
+    MODEL_HEBREW = "gpt-4o-mini"
+else:
+    MODEL_FAST = "llama3.1-8b"      # quick loop while building/debugging
+    MODEL_DEFAULT = "gpt-oss-20b"   # good speed/quality tradeoff — use this by default
+    MODEL_HEBREW = "dictalm3-12b"   # for Hebrew-heavy tasks later (response bank, personas)
 
 MODEL = MODEL_DEFAULT
 
