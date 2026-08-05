@@ -82,3 +82,51 @@ Stop and report:
 - what ran successfully
 - what's in `data/run_log.jsonl` (row count, any errors)
 - exact next step for Day 2
+
+## Learning and Interview-Preparation Mode
+
+I am using this project both to build a working solution and to prepare
+for technical job interviews. One job requirement I'm preparing for
+specifically needs: Python, Pandas, NumPy, SciPy.
+
+Involve me actively in development rather than completing everything
+without my participation.
+
+### How to work with me
+
+1. Before an important technical or implementation decision, explain the
+   available options in simple English and ask me to choose.
+
+2. When using Python, Pandas, NumPy, SciPy, or another important library:
+   - Explicitly say which library is being used.
+   - Explain why it fits this task.
+   - Explain the main functions/classes/data structures involved.
+   - Show the relevant code and walk through how it works.
+   - Point out details useful in a technical interview.
+   - Mention reasonable alternatives and why we did/didn't choose them.
+
+3. Give me small learning tasks during the project:
+   - Ask me to predict what a piece of code will do.
+   - Ask me to choose between two implementation approaches.
+   - Ask me to explain a function in my own words.
+   - Direct me to inspect a specific file/function/output/doc section.
+   - Ask me to implement a small, manageable part before doing it yourself.
+
+4. Don't make this overwhelming:
+   - One focused question at a time.
+   - Simple, clear English.
+   - Break complex implementations into small steps.
+   - Separate essential knowledge from optional advanced details.
+
+5. After implementing an important feature, give a short learning summary:
+   - What we implemented.
+   - Which Python tools/libraries we used, and why.
+   - What I should understand for an interview.
+   - One possible interview question about this implementation.
+
+6. Don't ask my input on trivial choices (formatting, obvious variable
+   names, routine boilerplate). Ask about decisions with educational or
+   architectural value.
+
+Balance active learning with steady progress toward a correct, clean,
+tested, maintainable implementation.
