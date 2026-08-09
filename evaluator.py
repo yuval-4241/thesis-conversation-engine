@@ -16,7 +16,9 @@ import json
 import re
 from dataclasses import dataclass
 import llm_client
-from prompts.evaluator_prompt import EVALUATOR_SYSTEM_PROMPT
+from prompts.evaluator_prompt import EVALUATOR_SYSTEM_PROMPT_A, EVALUATOR_SYSTEM_PROMPT_B
+
+_PROMPT_VARIANTS = {"A": EVALUATOR_SYSTEM_PROMPT_A, "B": EVALUATOR_SYSTEM_PROMPT_B}
 
 
 @dataclass
@@ -35,9 +37,12 @@ def _strip_fences(text: str) -> str:
     return text
 
 
-def evaluate(question: str, answer_text: str) -> Evaluation:
+def evaluate(question: str, answer_text: str, prompt_variant: str = "A") -> Evaluation:
+    if prompt_variant not in _PROMPT_VARIANTS:
+        raise ValueError(f"Unknown prompt_variant: {prompt_variant!r} (expected 'A' or 'B')")
+
     raw = llm_client.call_llm(
-        system=EVALUATOR_SYSTEM_PROMPT,
+        system=_PROMPT_VARIANTS[prompt_variant],
         user_message=f"Interview question: {question}\n\nCandidate answer: {answer_text}",
         max_tokens=400,
         temperature=0.3,  # lower temp — this is a judgment task, not creative
