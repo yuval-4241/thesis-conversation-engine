@@ -3,3 +3,5 @@ langgraph
 streamlit
 pandas
 scipy
+pydantic
+pytest
