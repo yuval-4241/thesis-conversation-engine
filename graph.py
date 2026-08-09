@@ -22,7 +22,9 @@ import personas
 import evaluator
 import guardrail
 import review_queue
+from pydantic import ValidationError
 from response_bank import ResponseBank
+from schemas import EvaluatorOutputSchema
 
 
 class ConversationState(TypedDict, total=False):
@@ -30,7 +32,8 @@ class ConversationState(TypedDict, total=False):
     persona: str
     answer_text: str
     evaluation: dict          # category, valence, arousal, confidence, rationale
-    guardrail_result: dict    # passed, matched_patterns
+    schema_invalid: bool      # True if evaluation failed EvaluatorOutputSchema twice
+    guardrail_result: dict    # passed, matched_patterns, style_leakage_score
     final_response: Optional[str]
     routed_to: str            # "review_queue" or "finalized"
 
@@ -43,17 +46,33 @@ def generate_answer(state: ConversationState) -> dict:
     return {"answer_text": ans.answer_text}
 
 
+def _evaluation_to_dict(ev) -> dict:
+    return {
+        "category": ev.category,
+        "valence": ev.valence,
+        "arousal": ev.arousal,
+        "confidence": ev.confidence,
+        "rationale": ev.rationale,
+    }
+
+
 def evaluate_node(state: ConversationState) -> dict:
     ev = evaluator.evaluate(state["question"], state["answer_text"])
-    return {
-        "evaluation": {
-            "category": ev.category,
-            "valence": ev.valence,
-            "arousal": ev.arousal,
-            "confidence": ev.confidence,
-            "rationale": ev.rationale,
-        }
-    }
+    evaluation_dict = _evaluation_to_dict(ev)
+
+    try:
+        EvaluatorOutputSchema(**evaluation_dict)
+        return {"evaluation": evaluation_dict, "schema_invalid": False}
+    except ValidationError as e:
+        retry_ev = evaluator.evaluate(
+            state["question"], state["answer_text"], retry_hint=str(e)
+        )
+        retry_dict = _evaluation_to_dict(retry_ev)
+        try:
+            EvaluatorOutputSchema(**retry_dict)
+            return {"evaluation": retry_dict, "schema_invalid": False}
+        except ValidationError:
+            return {"evaluation": retry_dict, "schema_invalid": True}
 
 
 def guardrail_node(state: ConversationState) -> dict:
@@ -69,6 +88,16 @@ def _is_low_confidence(state: ConversationState) -> bool:
     return state["evaluation"]["confidence"] < config.CONFIDENCE_ROUTE_THRESHOLD
 
 
+def _is_schema_invalid(state: ConversationState) -> bool:
+    return state.get("schema_invalid", False)
+
+
+def _route_after_evaluate(state: ConversationState) -> str:
+    if _is_schema_invalid(state):
+        return "route_to_review"
+    return "guardrail_check"
+
+
 def route_decision(state: ConversationState) -> str:
     if _is_flagged(state) or _is_low_confidence(state):
         return "route_to_review"
@@ -76,14 +105,17 @@ def route_decision(state: ConversationState) -> str:
 
 
 def route_to_review(state: ConversationState) -> dict:
-    flagged = _is_flagged(state)
-    low_confidence = _is_low_confidence(state)
-    if flagged and low_confidence:
-        reason = "low_confidence+guardrail_flag"
-    elif flagged:
-        reason = "guardrail_flag"
+    if state.get("schema_invalid"):
+        reason = "schema_invalid"
     else:
-        reason = "low_confidence"
+        flagged = _is_flagged(state)
+        low_confidence = _is_low_confidence(state)
+        if flagged and low_confidence:
+            reason = "low_confidence+guardrail_flag"
+        elif flagged:
+            reason = "guardrail_flag"
+        else:
+            reason = "low_confidence"
 
     review_queue.enqueue(
         {
@@ -91,7 +123,7 @@ def route_to_review(state: ConversationState) -> dict:
             "persona": state["persona"],
             "answer_text": state["answer_text"],
             "evaluation": state["evaluation"],
-            "guardrail_result": state["guardrail_result"],
+            "guardrail_result": state.get("guardrail_result"),
         },
         reason,
     )
@@ -132,7 +164,14 @@ def _build_graph():
 
     graph.set_entry_point("generate_answer")
     graph.add_edge("generate_answer", "evaluate")
-    graph.add_edge("evaluate", "guardrail_check")
+    graph.add_conditional_edges(
+        "evaluate",
+        _route_after_evaluate,
+        {
+            "route_to_review": "route_to_review",
+            "guardrail_check": "guardrail_check",
+        },
+    )
     graph.add_conditional_edges(
         "guardrail_check",
         route_decision,
