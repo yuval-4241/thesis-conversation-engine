@@ -20,9 +20,19 @@ import config
 class GuardrailResult:
     passed: bool
     matched_patterns: list = field(default_factory=list)
+    style_leakage_score: int = 0
+
+    def __post_init__(self):
+        # Always derived from matched_patterns — never independently settable,
+        # so the two fields can't drift out of sync with each other.
+        self.style_leakage_score = len(self.matched_patterns)
 
     def as_dict(self):
-        return {"passed": self.passed, "matched_patterns": self.matched_patterns}
+        return {
+            "passed": self.passed,
+            "matched_patterns": self.matched_patterns,
+            "style_leakage_score": self.style_leakage_score,
+        }
 
 
 def check_rationale(rationale_text: str) -> GuardrailResult:
