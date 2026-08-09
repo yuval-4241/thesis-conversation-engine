@@ -37,13 +37,25 @@ def _strip_fences(text: str) -> str:
     return text
 
 
-def evaluate(question: str, answer_text: str, prompt_variant: str = "A") -> Evaluation:
+def evaluate(
+    question: str,
+    answer_text: str,
+    prompt_variant: str = "A",
+    retry_hint: str = None,
+) -> Evaluation:
     if prompt_variant not in _PROMPT_VARIANTS:
         raise ValueError(f"Unknown prompt_variant: {prompt_variant!r} (expected 'A' or 'B')")
 
+    user_message = f"Interview question: {question}\n\nCandidate answer: {answer_text}"
+    if retry_hint:
+        user_message += (
+            f"\n\nYour previous response was invalid: {retry_hint}\n"
+            "Return ONLY valid JSON matching the required shape exactly."
+        )
+
     raw = llm_client.call_llm(
         system=_PROMPT_VARIANTS[prompt_variant],
-        user_message=f"Interview question: {question}\n\nCandidate answer: {answer_text}",
+        user_message=user_message,
         max_tokens=400,
         temperature=0.3,  # lower temp — this is a judgment task, not creative
     )
