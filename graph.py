@@ -115,14 +115,7 @@ def route_to_review(state: ConversationState) -> dict:
     if state.get("schema_invalid"):
         reason = "schema_invalid"
     else:
-        flagged = _is_flagged(state)
-        low_confidence = _is_low_confidence(state)
-        if flagged and low_confidence:
-            reason = "low_confidence+guardrail_flag"
-        elif flagged:
-            reason = "guardrail_flag"
-        else:
-            reason = "low_confidence"
+        reason = _build_review_reason(state)
 
     review_queue.enqueue(
         {
@@ -135,6 +128,21 @@ def route_to_review(state: ConversationState) -> dict:
         reason,
     )
     return {"final_response": None, "routed_to": "review_queue"}
+
+
+def _build_review_reason(state: ConversationState) -> str:
+    tags = []
+    if _is_low_confidence(state):
+        tags.append("low_confidence")
+    if _is_flagged(state):
+        severity = state["guardrail_result"].get("style_leakage_score", 0)
+        tags.append("guardrail_flag_severe" if severity >= 2 else "guardrail_flag")
+
+    consistency = state.get("consistency")
+    if tags and consistency and not consistency.get("consistent", True):
+        tags.append("consistency_flag")
+
+    return "+".join(tags)
 
 
 def select_response(state: ConversationState) -> dict:
@@ -152,6 +160,7 @@ def finalize(state: ConversationState) -> dict:
         "answer_text": state["answer_text"],
         "evaluation": state["evaluation"],
         "guardrail_result": state["guardrail_result"],
+        "consistency": state.get("consistency"),
         "final_response": state.get("final_response"),
         "routed_to": state["routed_to"],
     }
