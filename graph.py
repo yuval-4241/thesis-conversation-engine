@@ -34,6 +34,7 @@ class ConversationState(TypedDict, total=False):
     evaluation: dict          # category, valence, arousal, confidence, rationale
     schema_invalid: bool      # True if evaluation failed EvaluatorOutputSchema twice
     guardrail_result: dict    # passed, matched_patterns, style_leakage_score
+    consistency: dict         # consistent, note — from guardrail.check_consistency()
     final_response: Optional[str]
     routed_to: str            # "review_queue" or "finalized"
 
@@ -78,6 +79,12 @@ def evaluate_node(state: ConversationState) -> dict:
 def guardrail_node(state: ConversationState) -> dict:
     g = guardrail.check_rationale(state["evaluation"]["rationale"])
     return {"guardrail_result": g.as_dict()}
+
+
+def consistency_node(state: ConversationState) -> dict:
+    ev = state["evaluation"]
+    result = guardrail.check_consistency(ev["category"], ev["valence"])
+    return {"consistency": result.as_dict()}
 
 
 def _is_flagged(state: ConversationState) -> bool:
@@ -158,6 +165,7 @@ def _build_graph():
     graph.add_node("generate_answer", generate_answer)
     graph.add_node("evaluate", evaluate_node)
     graph.add_node("guardrail_check", guardrail_node)
+    graph.add_node("consistency_check", consistency_node)
     graph.add_node("route_to_review", route_to_review)
     graph.add_node("select_response", select_response)
     graph.add_node("finalize", finalize)
@@ -172,8 +180,9 @@ def _build_graph():
             "guardrail_check": "guardrail_check",
         },
     )
+    graph.add_edge("guardrail_check", "consistency_check")
     graph.add_conditional_edges(
-        "guardrail_check",
+        "consistency_check",
         route_decision,
         {
             "route_to_review": "route_to_review",
