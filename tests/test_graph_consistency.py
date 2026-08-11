@@ -66,6 +66,15 @@ def test_reason_escalates_with_consistency_flag_when_already_flagged():
     assert graph._build_review_reason(state) == "guardrail_flag+consistency_flag"
 
 
+def test_reason_combines_all_three_tags():
+    state = {
+        "evaluation": {"confidence": 0.5},
+        "guardrail_result": {"passed": False, "matched_patterns": ["eye contact", "monotone"], "style_leakage_score": 2},
+        "consistency": {"consistent": False, "note": "BAD category paired with high valence"},
+    }
+    assert graph._build_review_reason(state) == "low_confidence+guardrail_flag_severe+consistency_flag"
+
+
 def test_reason_does_not_escalate_when_nothing_else_flagged():
     """Consistency alone must never produce a reason on its own — it can
     only escalate a route that was already happening for another cause."""
@@ -116,12 +125,14 @@ def test_finalize_logs_null_consistency_on_schema_invalid_path(monkeypatch, tmp_
     monkeypatch.setattr(graph.config, "RUN_LOG_PATH", str(log_path))
     monkeypatch.setattr(graph.config, "DATA_DIR", str(tmp_path))
 
+    # On the schema_invalid path, guardrail_check and consistency_check never
+    # run, so LangGraph never sets these channels — the keys are *absent*
+    # from state entirely, not present with value None.
     state = {
         "question": "Q",
         "persona": "concise_confident",
         "answer_text": "A",
         "evaluation": {"category": "good", "valence": "medium", "arousal": "medium", "confidence": 0.9},
-        "guardrail_result": None,
         "final_response": None,
         "routed_to": "review_queue",
     }
@@ -130,4 +141,5 @@ def test_finalize_logs_null_consistency_on_schema_invalid_path(monkeypatch, tmp_
     import json
     with open(log_path) as f:
         record = json.loads(f.readline())
+    assert record["guardrail_result"] is None
     assert record["consistency"] is None

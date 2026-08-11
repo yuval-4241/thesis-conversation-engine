@@ -159,7 +159,7 @@ def finalize(state: ConversationState) -> dict:
         "persona": state["persona"],
         "answer_text": state["answer_text"],
         "evaluation": state["evaluation"],
-        "guardrail_result": state["guardrail_result"],
+        "guardrail_result": state.get("guardrail_result"),
         "consistency": state.get("consistency"),
         "final_response": state.get("final_response"),
         "routed_to": state["routed_to"],
