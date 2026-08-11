@@ -35,6 +35,32 @@ class GuardrailResult:
         }
 
 
+@dataclass
+class ConsistencyResult:
+    consistent: bool
+    note: str = None
+
+    def as_dict(self):
+        return {"consistent": self.consistent, "note": self.note}
+
+
+_INCONSISTENT_PAIRS = {
+    ("BAD", "high"),
+    ("GOOD", "low"),
+    ("NEUTRAL", "high"),
+    ("NEUTRAL", "low"),
+}
+
+
+def check_consistency(category: str, valence: str) -> ConsistencyResult:
+    if (category, valence) in _INCONSISTENT_PAIRS:
+        return ConsistencyResult(
+            consistent=False,
+            note=f"{category} category paired with {valence} valence",
+        )
+    return ConsistencyResult(consistent=True)
+
+
 def check_rationale(rationale_text: str) -> GuardrailResult:
     lowered = rationale_text.lower()
     matches = [p for p in config.NO_MASKING_FLAG_PATTERNS if p.lower() in lowered]
