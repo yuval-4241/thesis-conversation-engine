@@ -83,3 +83,12 @@ RUN_LOG_PATH = os.path.join(DATA_DIR, "run_log.jsonl")
 # data/run_log.jsonl, so each batch's records/summary are easy to inspect
 # on their own.
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
+
+# ── Robot reaction bridge (furhat-emotion-study, opt-in) ───────────────────
+# Off by default — most runs (pytest, run_demo.py, ab_test.py) never attempt
+# this call. Only set ROBOT_REACTION_ENABLED=true when the Furhat skill is
+# actually running and you want a live/simulated robot reaction alongside
+# the spoken reply. See docs/superpowers/specs/2026-08-11-robot-reaction-bridge-design.md.
+ROBOT_REACTION_ENABLED = os.environ.get("ROBOT_REACTION_ENABLED", "false").lower() == "true"
+ROBOT_BRIDGE_URL = "http://localhost:8765/react"
+ROBOT_BRIDGE_TIMEOUT = 2.0  # seconds — never let a dead robot connection stall the pipeline

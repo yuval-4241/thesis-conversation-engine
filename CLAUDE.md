@@ -1,71 +1,196 @@
-# CLAUDE.md — Project Instructions for Claude Code
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project
+
 Conversation Engine v1 — synthetic-tested evaluator pipeline for a Furhat
-social robot interview-training system (thesis project, No-Masking constraint
-is a hard requirement, see guardrail.py).
+social robot job-interview training system (thesis project). The **No-Masking
+constraint is a hard methodology requirement**: the evaluator must judge
+answer *content* only, never delivery style (tone, eye contact, STAR
+structure, directness) — this is what `guardrail.py` and
+`config.NO_MASKING_FLAG_PATTERNS` exist to enforce and audit. Every design
+decision gets checked against this constraint, including test scaffolding
+like `personas.py` and the guardrail's own pattern list.
+
+Robot integration (Furhat) is now a working prototype, not wired up by
+default: `graph.py`'s `select_response()` optionally sends a coordinated
+facial-emotion + spoken-reply reaction to a separate Furhat Skill project
+(`furhat-emotion-study`, a different repo, Kotlin/JVM) over a local HTTP
+bridge. Gated by `config.ROBOT_REACTION_ENABLED` (env-driven, **default
+False**) — `pytest`, `run_demo.py`, and `ab_test.py` never attempt the call
+unless it's explicitly turned on. See
+`docs/superpowers/specs/2026-08-11-robot-reaction-bridge-design.md`.
 
 ## Stack
+
 - Python 3.10+
-- LLM: lab GPU server, OpenAI-compatible API (see llm_client.py)
-- Token: `LAB_LLM_TOKEN` env var (never hardcode, never commit)
-- Orchestration: LangGraph
-- Demo: Streamlit
+- LLM access via an OpenAI-compatible client (`llm_client.py`) — either the
+  lab GPU server or OpenAI directly, switched by `LLM_PROVIDER`
+- Orchestration: LangGraph (`graph.py`)
+- Data analysis: pandas + scipy (`ab_test.py`)
+- Demo: Streamlit (not built yet)
 
-## Files already built (do not redesign, extend only)
-- `config.py` — VA matrix, no-masking patterns, model names
-- `prompts/` — all prompt/persona text (persona_prompts.py, evaluator_prompt.py);
-  prompts no longer live in config.py or inline in modules
-- `llm_client.py` — provider abstraction, ALL llm calls go through `call_llm()`
-- `personas.py` — synthetic candidate generator (#8)
-- `evaluator.py` — GOOD/NEUTRAL/BAD + VA classifier (#2)
-- `guardrail.py` — scans evaluator rationale for masking-coded language (#5)
-- `response_bank.py` — loads/queries VA-matched robot responses (#6)
-- `question_bank.py` — loads/queries session question set
-- `review_queue.py` — logs low-confidence/flagged items for human review (#7)
-- `data/response_bank_seed.json`, `data/question_bank_seed.json` — placeholder data
+## Commands
 
-## TODAY — Day 1 tasks, in order
+```bash
+# Setup
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+export LAB_LLM_TOKEN="your_token"        # or set LLM_PROVIDER=openai + OPENAI_API_KEY
 
-1. **Verify connection to lab server.**
-   - Confirm Tailscale is connected (`ping 100.110.96.82`)
-   - Set `LAB_LLM_TOKEN` env var
-   - Run a raw test call using `gpt-oss-20b` per the lab guide's quick-start
-   - If this fails, STOP and report — don't touch other code until this works
+# Run one conversation through the full graph (prints final state as JSON)
+python graph.py
 
-2. **Install deps:** `pip install -r requirements.txt`
+# Batch runner: every persona x every session_1 question, writes results/ + appends to data/run_log.jsonl
+python run_demo.py
 
-3. **Smoke-test each existing module individually, in this order:**
-   - `llm_client.call_llm(...)` with a trivial prompt
-   - `personas.generate_synthetic_answer("concise_confident", "Tell me about yourself")`
-   - `evaluator.evaluate(question, answer_text)` on the output above
-   - `guardrail.check_rationale(evaluation.rationale)`
-   - `response_bank.ResponseBank().get(evaluation.valence, evaluation.arousal)`
-   - Print every result. Do not move to graph.py until all five work standalone.
+# A/B test evaluator prompt variants A vs B (scipy chi-square test), writes data/ab_test_results.{csv,json}
+python ab_test.py --n 20
 
-4. **Build `graph.py`** — LangGraph state machine wiring the above into one flow:
-   ```
-   persona_answer -> evaluate -> guardrail_check -> 
-     [flagged OR confidence < config.CONFIDENCE_ROUTE_THRESHOLD]
-        -> review_queue.enqueue(...)
-     [else]
-        -> response_bank.get(...) -> finalize
-   ```
-   Log every stage's output to `data/run_log.jsonl` regardless of routing.
+# Smoke-test a single module standalone, e.g.:
+python -c "import evaluator; print(evaluator.evaluate('Tell me about yourself', 'I have 5 years in QA.'))"
+```
 
-5. **Run ONE full manual pass** through the graph with a real question from
-   `question_bank.py` and one persona. Confirm output end-to-end before
-   batching.
+```bash
+# Run the automated test suite (58 tests: schemas, guardrail, consistency,
+# evaluator, graph routing, emotion/robot-reaction bridge)
+pytest tests/ -v
+```
 
-## Rules for this session
+Beyond the automated suite, end-to-end verification is also done by running
+the modules/scripts above and inspecting output (e.g. `python graph.py` for
+a real, non-mocked full-pipeline pass).
 
-- **Use `MODEL_FAST` (`llama3.1-8b`) while building/debugging.** Fast feedback
-  loop matters more than quality right now. Switch to `MODEL_DEFAULT` only
-  for the final Day 1 test pass.
-- **Never use 70B+ models today.** Too slow, blocks the shared GPU.
-- **Never commit `.env` or hardcode the token.** Check `.gitignore` covers it.
-- **Don't modify `config.py`'s NO_MASKING_FLAG_PATTERNS or PERSONAS** without
-  flagging it — these are thesis-methodology decisions, not code decisions.
+## Architecture
+
+Five independently-testable pieces wired into one LangGraph state machine
+(`graph.py`):
+
+```
+persona answer -> evaluator -> schema guard (retry once on failure)
+                                    |
+                        still invalid after retry?
+                    yes -> review queue
+                    no  -> guardrail check
+                                    |
+                low confidence OR flagged?
+                    yes -> review queue
+                    no  -> response bank -> final robot reply
+```
+
+- **`personas.py`** (#8 synthetic participant) — generates fake candidate
+  answers in different communication styles via `generate_synthetic_answer()`.
+  Doubles as a bias probe: if the evaluator scores non-linear/minimal/blunt
+  personas worse than `concise_confident` at equal information content,
+  that's evidence of style bias to fix upstream.
+- **`evaluator.py`** (#2) — `evaluate()` makes one LLM call that returns
+  category (GOOD/NEUTRAL/BAD, content-presence-only) *and* an independent
+  valence/arousal "interpretive stance" + rationale, in a single JSON
+  response. Category and VA are deliberately decoupled — VA is not a quality
+  readout, so an internally "inconsistent" pair (e.g. `BAD` + high valence)
+  is allowed by design, not a bug. Takes an optional `retry_hint` string,
+  used by `graph.py` to re-prompt with the Pydantic validation error when
+  the first response fails the schema guard.
+- **`schemas.py`** — `EvaluatorOutputSchema` (Pydantic) validates the
+  evaluator's JSON before it's trusted downstream (category/VA enum values,
+  `confidence` in [0,1], non-empty rationale). `Category`/`VALevel` are
+  hardcoded `Literal`s mirroring `config.py`'s category/VA lists —
+  `tests/test_schemas.py` checks the two don't drift apart.
+- **`guardrail.py`** (#5 No-Masking guardrail) — `check_rationale()` scans
+  the evaluator's own rationale text (not the candidate's answer) for
+  style-bias language from `config.NO_MASKING_FLAG_PATTERNS`. Deliberately
+  rule-based, not a second LLM call, so it stays fast and fully auditable.
+  `GuardrailResult.style_leakage_score` is derived (`len(matched_patterns)`),
+  never set independently, so it can't drift out of sync with the match list.
+  `check_consistency(category, valence)` flags four suspicious pairs (e.g.
+  `BAD`+high valence) where the VA "reaction" looks like it might be a
+  disguised quality score — non-blocking on its own, it only escalates the
+  review-queue reason when something else already triggered a route there.
+- **`response_bank.py`** (#6) — `ResponseBank.get(valence, arousal)` returns
+  a random VA-matched robot reply from the 3x3 VA matrix
+  (`config.va_cells()`). Backed by `data/response_bank_seed.json`
+  (placeholder Hebrew data, 9 cells) — swap the seed file without touching
+  the module's API.
+- **`emotion_bank.py`** — companion to `response_bank.py`: same
+  `(valence, arousal)` input, same 3×3-grid pattern, but returns a Furhat
+  facial emotion + intensity (`data/emotion_bank_seed.json`) instead of
+  reply text. Deliberately reads the *same* VA pair as the text reply
+  rather than a second, independent judgment, so the robot's face and
+  spoken reply can never contradict each other.
+- **`robot_bridge.py`** — `send_reaction(emotion, intensity, text)` POSTs
+  to `furhat-emotion-study`'s local HTTP bridge (a separate Kotlin repo,
+  `localhost:8765/react` by default) so the robot shows the matching face
+  while speaking the reply. Opt-in via `config.ROBOT_REACTION_ENABLED`
+  (default `False`); never raises — a disconnected/absent robot must never
+  break the evaluation pipeline for a candidate.
+- **`question_bank.py`** — loads the 30-question interview set
+  (`data/question_bank_seed.json`), organized into 5 sessions of 6 questions
+  each, increasing in difficulty.
+- **`review_queue.py`** (#7 HITL) — `enqueue()` writes to
+  `data/review_queue.jsonl` when an item is low-confidence
+  (`confidence < config.CONFIDENCE_ROUTE_THRESHOLD`) or guardrail-flagged.
+  This becomes the golden-set / Cohen's-kappa dataset once a human fills in
+  `human_label`.
+- **`graph.py`** — wires all of the above into a LangGraph `StateGraph`
+  (`ConversationState` TypedDict). Routing logic (`route_decision`,
+  `_route_after_evaluate`) lives here, not in the individual modules. After
+  `evaluate`, the output is checked against `EvaluatorOutputSchema`; on
+  failure the evaluator is called once more with `retry_hint` set, and if
+  that retry also fails validation the item is routed straight to the
+  review queue (`reason="schema_invalid"`) without ever reaching the
+  guardrail. Every run appends one record to `data/run_log.jsonl`
+  regardless of routing outcome, via the `finalize` node — this is the
+  cumulative dataset for later kappa/bias analysis.
+- **`run_demo.py`** — batch driver: every persona x every session-1
+  question through `graph.run_conversation()`, writing a per-batch JSONL +
+  summary to `results/` (separate from the cumulative `data/run_log.jsonl`).
+- **`ab_test.py`** — compares `EVALUATOR_SYSTEM_PROMPT_A` vs `_B`
+  (`prompts/evaluator_prompt.py`) by scoring the *same* generated answers
+  under both variants, then runs `scipy.stats.chi2_contingency` on the
+  (variant x category) `pandas.crosstab` to test whether prompt wording
+  shifts the category distribution.
+- **`llm_client.py`** — the only file that imports `openai` directly. Every
+  other module calls `llm_client.call_llm()`; swapping providers/backends
+  only ever touches this file.
+- **`config.py`** — central settings: model names, VA matrix helpers,
+  `CONFIDENCE_ROUTE_THRESHOLD`, file paths, and `NO_MASKING_FLAG_PATTERNS`.
+- **`prompts/`** — all prompt/persona text (`persona_prompts.py`,
+  `evaluator_prompt.py`). Prompts do not live inline in modules or in
+  `config.py`.
+
+**Data flow contract:** dataclasses (`SyntheticAnswer`, `Evaluation`,
+`GuardrailResult`) are produced by each module standalone, then converted to
+plain dicts as they enter `ConversationState` in `graph.py` — the graph
+nodes never pass dataclass instances between each other, only dicts.
+
+**Methodology-locked content** (do not edit without flagging — see rules
+below): `config.NO_MASKING_FLAG_PATTERNS`, `PERSONAS`
+(`prompts/persona_prompts.py`), and `EVALUATOR_SYSTEM_PROMPT_A`/`_B`
+(`prompts/evaluator_prompt.py`). These encode thesis-methodology decisions,
+not implementation details.
+
+See `docs/unified_architecture.md` for a design-level gap analysis against
+the broader academic pipeline this repo implements a slice of. The schema
+guard (Task 4 in that doc) is now implemented (`schemas.py` + `graph.py`);
+other analyzed gaps (e.g. category/VA consistency checks) are not — check
+the doc's status table before assuming something described there exists.
+
+## Rules for every session
+
+- **Use `config.MODEL_FAST` while building/debugging** (`llama3.1-8b` on the
+  lab server, `gpt-4o-mini` under `LLM_PROVIDER=openai`). Fast feedback
+  matters more than quality during iteration. Switch to `MODEL_DEFAULT`
+  only for real test passes.
+- **Never use 70B+ models.** Too slow, blocks the shared GPU.
+- **Never commit `.env` or hardcode `LAB_LLM_TOKEN`/`OPENAI_API_KEY`.**
+- **Don't modify `config.NO_MASKING_FLAG_PATTERNS`, `PERSONAS`, or
+  `EVALUATOR_SYSTEM_PROMPT_A`/`_B` without flagging it first** — these are
+  thesis-methodology decisions, not code decisions.
+- Current day-by-day task list and progress live in `PROJECT_PLAN.md`
+  (week-by-week plan) and `SESSION_LOG.md` (running log, "resume from here"
+  notes) — check those for what's already built vs. up next, rather than
+  relying on any task list baked into this file.
 
 ## If something doesn't work
 
@@ -78,10 +203,11 @@ Report in this exact format — do not guess at the root cause, list options:
 - (bullet each fix option, tag with effort: low/medium/high)
 
 ## End of session
+
 Stop and report:
 - what ran successfully
 - what's in `data/run_log.jsonl` (row count, any errors)
-- exact next step for Day 2
+- exact next step for next session
 
 ## Learning and Interview-Preparation Mode
 

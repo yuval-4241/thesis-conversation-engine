@@ -4,4 +4,7 @@ __pycache__/
 *.pyc
 data/review_queue.jsonl
 data/run_log.jsonl
+data/external/
 results/
+archive.zip
+הקלטות-יובל/
