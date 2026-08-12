@@ -39,6 +39,7 @@ class ConversationState(TypedDict, total=False):
     guardrail_result: dict    # passed, matched_patterns, style_leakage_score
     consistency: dict         # consistent, note — from guardrail.check_consistency()
     final_response: Optional[str]
+    emotion_reaction: dict    # emotion, intensity — from emotion_bank.get(), always computed
     robot_reaction: dict      # sent, reason — from robot_bridge.send_reaction()
     routed_to: str            # "review_queue" or "finalized"
 
@@ -159,6 +160,7 @@ def select_response(state: ConversationState) -> dict:
 
     return {
         "final_response": response,
+        "emotion_reaction": reaction,
         "robot_reaction": robot_reaction,
         "routed_to": "finalized",
     }
@@ -175,6 +177,7 @@ def finalize(state: ConversationState) -> dict:
         "guardrail_result": state.get("guardrail_result"),
         "consistency": state.get("consistency"),
         "final_response": state.get("final_response"),
+        "emotion_reaction": state.get("emotion_reaction"),
         "robot_reaction": state.get("robot_reaction"),
         "routed_to": state["routed_to"],
     }

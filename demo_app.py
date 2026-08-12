@@ -101,12 +101,24 @@ if run_clicked:
             state.update(graph.select_response(state))
             st.success("Finalized — robot reply:")
             st.write(f"**“{state['final_response']}”**")
+
+            reaction = state["emotion_reaction"]
+            st.write(
+                f"**Robot's facial reaction:** {reaction['emotion']} "
+                f"(intensity {reaction['intensity']}/3) — picked from the same "
+                f"valence/arousal as the reply above, always computed, sent or not."
+            )
             if config.ROBOT_REACTION_ENABLED:
                 rr = state["robot_reaction"]
                 if rr["sent"]:
-                    st.info("Robot reaction sent to the furhat-emotion-study bridge.")
+                    st.info("Sent to the furhat-emotion-study bridge — check the robot/simulator.")
                 else:
-                    st.warning(f"Robot reaction not sent: {rr['reason']}")
+                    st.warning(f"Not sent: {rr['reason']}")
+            else:
+                st.caption(
+                    "config.ROBOT_REACTION_ENABLED is off, so this wasn't sent to a robot — "
+                    "only picked and logged."
+                )
 
         graph.finalize(state)
 

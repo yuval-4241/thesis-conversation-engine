@@ -15,6 +15,12 @@ def test_select_response_includes_disabled_robot_reaction_by_default(monkeypatch
     assert result["routed_to"] == "finalized"
     assert result["final_response"]  # still picks a real text reply
 
+    # emotion_reaction is the actual (emotion, intensity) pick -- distinct
+    # from robot_reaction (whether it was sent). medium/medium -> INTEREST @ 2
+    # in data/emotion_bank_seed.json. Computed and visible even when
+    # ROBOT_REACTION_ENABLED is off, since it's a free local lookup.
+    assert result["emotion_reaction"] == {"emotion": "INTEREST", "intensity": 2}
+
 
 def test_select_response_sends_reaction_when_enabled(monkeypatch):
     monkeypatch.setattr(graph.config, "ROBOT_REACTION_ENABLED", True)
@@ -39,6 +45,7 @@ def test_select_response_sends_reaction_when_enabled(monkeypatch):
     assert captured["intensity"] == 3
     assert captured["text"] == result["final_response"]  # same text response_bank picked
     assert result["robot_reaction"] == {"sent": True, "reason": None}
+    assert result["emotion_reaction"] == {"emotion": "HAPPINESS", "intensity": 3}
 
 
 def test_finalize_logs_robot_reaction_field(monkeypatch, tmp_path):
@@ -56,12 +63,14 @@ def test_finalize_logs_robot_reaction_field(monkeypatch, tmp_path):
         "final_response": "some reply",
         "routed_to": "finalized",
         "robot_reaction": {"sent": False, "reason": "disabled"},
+        "emotion_reaction": {"emotion": "INTEREST", "intensity": 2},
     }
     graph.finalize(state)
 
     with open(log_path) as f:
         record = json.loads(f.readline())
     assert record["robot_reaction"] == {"sent": False, "reason": "disabled"}
+    assert record["emotion_reaction"] == {"emotion": "INTEREST", "intensity": 2}
 
 
 def test_finalize_logs_null_robot_reaction_on_review_queue_path(monkeypatch, tmp_path):
@@ -87,3 +96,4 @@ def test_finalize_logs_null_robot_reaction_on_review_queue_path(monkeypatch, tmp
     with open(log_path) as f:
         record = json.loads(f.readline())
     assert record["robot_reaction"] is None
+    assert record["emotion_reaction"] is None
