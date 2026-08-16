@@ -3,18 +3,30 @@ Emotion Bank — coordinated facial-reaction lookup for the Furhat bridge.
 
 Companion to response_bank.py: picks the robot's facial emotion+intensity
 from the SAME (valence, arousal) pair response_bank.py already uses for
-the spoken reply, so the two channels can never disagree. See
-docs/superpowers/specs/2026-08-11-robot-reaction-bridge-design.md for the
-full design and why an independent second judgment (e.g. a separate LLM
-call picking the emotion on its own) was rejected.
+the spoken reply, so the two channels can never disagree on overall tone.
 
-Prototype status: not wired into graph.py. Feeds furhat-emotion-study's
-RemoteControl bridge (a separate Kotlin repo) once/if this graduates out
-of prototype scope.
+Each VA cell offers a small set of pre-approved, valence-consistent
+candidate emotions (e.g. medium valence -> INTEREST or SURPRISE, never
+ANGER) rather than one fixed emotion. Which candidate gets used:
+
+- config.EMOTION_LLM_SELECTION_ENABLED=False (default): candidates[0],
+  deterministic, no LLM call. Free, matches every existing test/batch run.
+- =True: an LLM (pick_emotion_llm) picks between the pre-approved options
+  based on the actual answer content -- automated variety without the
+  face ever landing outside the valence family the text already implies.
+
+An earlier design let an LLM choose completely freely across all 10
+emotions, independent of valence/arousal -- rejected, since that risks a
+face that contradicts the spoken reply's tone, which actively undermines
+this tool's purpose for autistic users practicing to read consistent
+social signals. The candidate-list constraint is what makes automated
+selection safe to reintroduce. See
+docs/superpowers/specs/2026-08-11-robot-reaction-bridge-design.md.
 """
 
 import json
 import config
+import llm_client
 
 
 class EmotionBank:
@@ -23,9 +35,57 @@ class EmotionBank:
             self._data = json.load(f)
         self._data.pop("_note", None)
 
-    def get(self, valence: str, arousal: str) -> dict:
+    def get(
+        self,
+        valence: str,
+        arousal: str,
+        question: str = None,
+        answer_text: str = None,
+        rationale: str = None,
+    ) -> dict:
         key = config.va_cell_key(valence, arousal)
-        reaction = self._data.get(key)
-        if not reaction:
+        cell = self._data.get(key)
+        if not cell:
             raise KeyError(f"No emotion reaction found for VA cell '{key}'")
-        return reaction
+
+        candidates = cell["candidates"]
+        if config.EMOTION_LLM_SELECTION_ENABLED:
+            emotion = pick_emotion_llm(
+                candidates, question=question, answer_text=answer_text, rationale=rationale
+            )
+        else:
+            emotion = candidates[0]
+
+        return {"emotion": emotion, "intensity": cell["intensity"]}
+
+
+def pick_emotion_llm(candidates: list, question: str, answer_text: str, rationale: str) -> str:
+    """Picks between exactly two pre-approved, already valence-consistent
+    emotions based on the answer's actual content. Not a free choice across
+    all emotions -- both options were already vetted to fit the same
+    overall tone as the spoken reply, so this only refines which one fits
+    better, never picks something that contradicts the text."""
+    system = (
+        "You are choosing which of two possible robot facial reactions best "
+        "fits a job interview answer, based on its content. Both options are "
+        "already appropriate in overall tone -- you are only picking the more "
+        "specific fit, not judging the answer's quality.\n\n"
+        f"Options: {candidates[0]} or {candidates[1]}\n\n"
+        "Respond with ONLY one of those two exact words, nothing else."
+    )
+    user_message = (
+        f"Interview question: {question}\n\n"
+        f"Candidate answer: {answer_text}\n\n"
+        f"Evaluator's rationale: {rationale}"
+    )
+
+    raw = llm_client.call_llm(
+        system=system,
+        user_message=user_message,
+        max_tokens=10,
+        temperature=0.3,
+    ).strip()
+
+    if raw in candidates:
+        return raw
+    return candidates[0]  # fail closed on any unexpected response

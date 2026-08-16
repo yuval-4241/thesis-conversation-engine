@@ -92,3 +92,11 @@ RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
 ROBOT_REACTION_ENABLED = os.environ.get("ROBOT_REACTION_ENABLED", "false").lower() == "true"
 ROBOT_BRIDGE_URL = "http://localhost:8765/react"
 ROBOT_BRIDGE_TIMEOUT = 2.0  # seconds — never let a dead robot connection stall the pipeline
+
+# Off by default — when False, EmotionBank.get() deterministically picks
+# candidates[0] for each cell, no LLM call, free. When True, an LLM picks
+# among that cell's pre-approved (valence-consistent) candidates based on
+# the actual answer content, for variety without risking a face that
+# contradicts the spoken reply's tone. Independent of ROBOT_REACTION_ENABLED
+# so the variety is visible in demo_app.py even without a robot connected.
+EMOTION_LLM_SELECTION_ENABLED = os.environ.get("EMOTION_LLM_SELECTION_ENABLED", "false").lower() == "true"

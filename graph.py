@@ -155,7 +155,11 @@ def select_response(state: ConversationState) -> dict:
     ev = state["evaluation"]
     response = _response_bank.get(ev["valence"], ev["arousal"])
 
-    reaction = _emotion_bank.get(ev["valence"], ev["arousal"])
+    reaction = _emotion_bank.get(
+        ev["valence"], ev["arousal"],
+        question=state.get("question"), answer_text=state.get("answer_text"),
+        rationale=ev.get("rationale"),
+    )
     robot_reaction = robot_bridge.send_reaction(reaction["emotion"], reaction["intensity"], text=response)
 
     return {

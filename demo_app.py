@@ -103,10 +103,13 @@ if run_clicked:
             st.write(f"**“{state['final_response']}”**")
 
             reaction = state["emotion_reaction"]
+            cell_key = config.va_cell_key(ev["valence"], ev["arousal"])
+            candidates = graph._emotion_bank._data[cell_key]["candidates"]
+            selection_mode = "LLM-picked" if config.EMOTION_LLM_SELECTION_ENABLED else "default"
             st.write(
                 f"**Robot's facial reaction:** {reaction['emotion']} "
-                f"(intensity {reaction['intensity']}/3) — picked from the same "
-                f"valence/arousal as the reply above, always computed, sent or not."
+                f"(intensity {reaction['intensity']}/3) — {selection_mode} from "
+                f"{candidates} for {ev['valence']} valence, always computed, sent or not."
             )
             if config.ROBOT_REACTION_ENABLED:
                 rr = state["robot_reaction"]
