@@ -50,30 +50,48 @@ def test_llm_selection_disabled_by_default_picks_first_candidate(monkeypatch):
     monkeypatch.setattr(emotion_bank, "pick_emotion_llm", lambda *a, **k: called.append(1))
 
     bank = EmotionBank()
-    reaction = bank.get("medium", "medium", question="Q", answer_text="A", rationale="R")
+    reaction = bank.get("low", "medium", question="Q", answer_text="A", rationale="R")
 
-    assert reaction == {"emotion": "INTEREST", "intensity": 2}  # candidates[0]
+    assert reaction == {"emotion": "SADNESS", "intensity": 2}  # candidates[0]
     assert called == []  # no LLM call made
 
 
 def test_llm_selection_enabled_uses_pick_emotion_llm(monkeypatch):
     monkeypatch.setattr(config, "EMOTION_LLM_SELECTION_ENABLED", True)
-    monkeypatch.setattr(emotion_bank, "pick_emotion_llm", lambda candidates, **k: "SURPRISE")
+    monkeypatch.setattr(emotion_bank, "pick_emotion_llm", lambda candidates, **k: "FEAR")
 
     bank = EmotionBank()
-    reaction = bank.get("medium", "medium", question="Q", answer_text="A", rationale="R")
+    reaction = bank.get("low", "medium", question="Q", answer_text="A", rationale="R")
 
-    assert reaction == {"emotion": "SURPRISE", "intensity": 2}
+    assert reaction == {"emotion": "FEAR", "intensity": 2}
+
+
+def test_single_candidate_cell_never_calls_llm_even_when_enabled(monkeypatch):
+    """high and medium valence each have only one valid candidate in the
+    core-7-only design -- there's nothing to choose between, so the LLM
+    must never be called for them regardless of the flag."""
+    monkeypatch.setattr(config, "EMOTION_LLM_SELECTION_ENABLED", True)
+
+    called = []
+    monkeypatch.setattr(emotion_bank, "pick_emotion_llm", lambda *a, **k: called.append(1))
+
+    bank = EmotionBank()
+    high_reaction = bank.get("high", "medium")
+    medium_reaction = bank.get("medium", "medium")
+
+    assert high_reaction == {"emotion": "HAPPINESS", "intensity": 2}
+    assert medium_reaction == {"emotion": "SURPRISE", "intensity": 2}
+    assert called == []
 
 
 def test_pick_emotion_llm_returns_llms_choice_when_valid(monkeypatch):
-    monkeypatch.setattr(emotion_bank.llm_client, "call_llm", lambda **k: "SURPRISE")
+    monkeypatch.setattr(emotion_bank.llm_client, "call_llm", lambda **k: "FEAR")
 
     result = pick_emotion_llm(
-        ["INTEREST", "SURPRISE"], question="Q", answer_text="A", rationale="R"
+        ["SADNESS", "FEAR"], question="Q", answer_text="A", rationale="R"
     )
 
-    assert result == "SURPRISE"
+    assert result == "FEAR"
 
 
 def test_pick_emotion_llm_falls_back_to_first_candidate_on_bad_response(monkeypatch):
@@ -81,10 +99,10 @@ def test_pick_emotion_llm_falls_back_to_first_candidate_on_bad_response(monkeypa
     anything else (extra text, hallucinated emotion, empty), fail closed
     to the deterministic default rather than propagating garbage into the
     VA-consistent contract."""
-    monkeypatch.setattr(emotion_bank.llm_client, "call_llm", lambda **k: "I think INTEREST fits best")
+    monkeypatch.setattr(emotion_bank.llm_client, "call_llm", lambda **k: "I think SADNESS fits best")
 
     result = pick_emotion_llm(
-        ["INTEREST", "SURPRISE"], question="Q", answer_text="A", rationale="R"
+        ["SADNESS", "FEAR"], question="Q", answer_text="A", rationale="R"
     )
 
-    assert result == "INTEREST"  # candidates[0], not the garbled response
+    assert result == "SADNESS"  # candidates[0], not the garbled response

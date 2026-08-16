@@ -16,10 +16,11 @@ def test_select_response_includes_disabled_robot_reaction_by_default(monkeypatch
     assert result["final_response"]  # still picks a real text reply
 
     # emotion_reaction is the actual (emotion, intensity) pick -- distinct
-    # from robot_reaction (whether it was sent). medium/medium -> INTEREST @ 2
-    # in data/emotion_bank_seed.json. Computed and visible even when
-    # ROBOT_REACTION_ENABLED is off, since it's a free local lookup.
-    assert result["emotion_reaction"] == {"emotion": "INTEREST", "intensity": 2}
+    # from robot_reaction (whether it was sent). medium/medium -> SURPRISE @ 2
+    # in data/emotion_bank_seed.json (medium valence's only core-7 candidate).
+    # Computed and visible even when ROBOT_REACTION_ENABLED is off, since
+    # it's a free local lookup.
+    assert result["emotion_reaction"] == {"emotion": "SURPRISE", "intensity": 2}
 
 
 def test_select_response_sends_reaction_when_enabled(monkeypatch):

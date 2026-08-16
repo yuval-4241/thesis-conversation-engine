@@ -6,14 +6,20 @@ from the SAME (valence, arousal) pair response_bank.py already uses for
 the spoken reply, so the two channels can never disagree on overall tone.
 
 Each VA cell offers a small set of pre-approved, valence-consistent
-candidate emotions (e.g. medium valence -> INTEREST or SURPRISE, never
-ANGER) rather than one fixed emotion. Which candidate gets used:
+candidate emotions rather than one fixed emotion, where the data supports
+it. Restricted to Ekman's core 7 (Anger, Contempt, Disgust, Fear,
+Happiness, Sadness, Surprise) -- no LOVE/SHAME/INTEREST. The core 7 skew
+heavily negative, so only low valence (SADNESS/FEAR) actually has 2 valid
+candidates; high (HAPPINESS) and medium (SURPRISE) each only have one
+genuine option. Which candidate gets used when there's more than one:
 
 - config.EMOTION_LLM_SELECTION_ENABLED=False (default): candidates[0],
   deterministic, no LLM call. Free, matches every existing test/batch run.
 - =True: an LLM (pick_emotion_llm) picks between the pre-approved options
   based on the actual answer content -- automated variety without the
   face ever landing outside the valence family the text already implies.
+  Cells with only one candidate never call the LLM, flag or not --
+  nothing to choose between.
 
 An earlier design let an LLM choose completely freely across all 10
 emotions, independent of valence/arousal -- rejected, since that risks a
@@ -49,12 +55,12 @@ class EmotionBank:
             raise KeyError(f"No emotion reaction found for VA cell '{key}'")
 
         candidates = cell["candidates"]
-        if config.EMOTION_LLM_SELECTION_ENABLED:
+        if config.EMOTION_LLM_SELECTION_ENABLED and len(candidates) > 1:
             emotion = pick_emotion_llm(
                 candidates, question=question, answer_text=answer_text, rationale=rationale
             )
         else:
-            emotion = candidates[0]
+            emotion = candidates[0]  # nothing to choose between otherwise
 
         return {"emotion": emotion, "intensity": cell["intensity"]}
 
