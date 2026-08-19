@@ -14,6 +14,7 @@ import streamlit as st
 
 import config
 import graph
+import emotion_classifier
 from question_bank import QuestionBank
 from prompts.persona_prompts import PERSONAS
 
@@ -103,14 +104,21 @@ if run_clicked:
             st.write(f"**“{state['final_response']}”**")
 
             reaction = state["emotion_reaction"]
-            cell_key = config.va_cell_key(ev["valence"], ev["arousal"])
-            candidates = graph._emotion_bank._data[cell_key]["candidates"]
-            selection_mode = "LLM-picked" if config.EMOTION_LLM_SELECTION_ENABLED else "default"
+            derived_valence = emotion_classifier.derive_valence(reaction["emotion"])
+            derived_arousal = emotion_classifier.derive_arousal(reaction["intensity"])
             st.write(
                 f"**Robot's facial reaction:** {reaction['emotion']} "
-                f"(intensity {reaction['intensity']}/3) — {selection_mode} from "
-                f"{candidates} for {ev['valence']} valence, always computed, sent or not."
+                f"(intensity {reaction['intensity']}/3) → derived valence/arousal: "
+                f"{derived_valence}/{derived_arousal}, always computed, sent or not."
             )
+            if derived_valence != ev["valence"] or derived_arousal != ev["arousal"]:
+                st.caption(
+                    f"Note: evaluator's own interpretive stance ({ev['valence']}/{ev['arousal']}) "
+                    f"differs from the classified-emotion-derived pair used for the spoken reply "
+                    f"({derived_valence}/{derived_arousal}). Both are logged; this divergence is "
+                    "expected, not a bug — see docs/superpowers/specs/"
+                    "2026-08-16-emotion-first-classification-design.md."
+                )
             if config.ROBOT_REACTION_ENABLED:
                 rr = state["robot_reaction"]
                 if rr["sent"]:
