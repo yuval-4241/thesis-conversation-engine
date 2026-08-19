@@ -21,6 +21,32 @@ def test_classify_emotion_strips_code_fences(monkeypatch):
     assert result == {"emotion": "HAPPINESS", "intensity": 3}
 
 
+def test_classify_emotion_discards_cue_field_from_return_value(monkeypatch):
+    """The chain-of-thought "cue" field is a reasoning scratchpad the model
+    fills in before naming the emotion -- it must never appear in
+    classify_emotion()'s return value, only emotion/intensity do."""
+    monkeypatch.setattr(
+        emotion_classifier.llm_client, "call_llm",
+        lambda **k: '{"cue": "no complaints, flat factual tone", "emotion": "SURPRISE", "intensity": 1}'
+    )
+    result = classify_emotion("Tell me about yourself", "I have 5 years of experience in QA.")
+    assert result == {"emotion": "SURPRISE", "intensity": 1}
+    assert "cue" not in result
+
+
+def test_classify_emotion_uses_higher_temperature_for_variety(monkeypatch):
+    captured = {}
+
+    def fake_call_llm(**kwargs):
+        captured.update(kwargs)
+        return '{"cue": "none", "emotion": "HAPPINESS", "intensity": 2}'
+
+    monkeypatch.setattr(emotion_classifier.llm_client, "call_llm", fake_call_llm)
+    classify_emotion("Q", "A")
+
+    assert captured["temperature"] == 0.8
+
+
 def test_classify_emotion_falls_back_on_non_json(monkeypatch):
     monkeypatch.setattr(emotion_classifier.llm_client, "call_llm", lambda **k: "not json at all")
     result = classify_emotion("Q", "A")

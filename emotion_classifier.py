@@ -54,12 +54,20 @@ _FALLBACK = {"emotion": "SURPRISE", "intensity": 2}
 
 _SYSTEM_PROMPT = (
     "You are classifying the emotional content of a job interview answer, "
-    "independent of how good or bad the answer is. Pick exactly one of "
-    "Ekman's core emotions that best fits the answer's content: "
+    "independent of how good or bad the answer is.\n\n"
+    "First, find the specific word or phrase in the answer that most "
+    "signals an emotion -- not the overall tone of a confident or "
+    "professional-sounding answer, just what's actually there. Generic "
+    "confident or professional phrasing on its own is not a signal of "
+    "happiness -- do not default to HAPPINESS just because an answer "
+    "sounds competent or matter-of-fact.\n\n"
+    "Then pick exactly one of Ekman's core emotions that best fits: "
     "ANGER, CONTEMPT, DISGUST, FEAR, HAPPINESS, SADNESS, SURPRISE. "
     "Also rate its intensity from 1 (mild) to 3 (strong).\n\n"
     "Respond with ONLY a JSON object of the exact shape: "
-    '{"emotion": "<ONE_OF_THE_7_WORDS_ABOVE>", "intensity": <1, 2, or 3>}'
+    '{"cue": "<the word or phrase, or \\"none\\" if truly nothing '
+    'stands out>", "emotion": "<ONE_OF_THE_7_WORDS_ABOVE>", '
+    '"intensity": <1, 2, or 3>}'
 )
 
 
@@ -76,8 +84,8 @@ def classify_emotion(question: str, answer_text: str) -> dict:
     raw = llm_client.call_llm(
         system=_SYSTEM_PROMPT,
         user_message=user_message,
-        max_tokens=50,
-        temperature=0.3,  # judgment task, not creative
+        max_tokens=80,
+        temperature=0.8,  # variety over reproducibility -- see spec
     )
     raw = _strip_fences(raw)
 

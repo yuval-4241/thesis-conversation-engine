@@ -91,14 +91,23 @@ test's expectations on `classify_emotion()`'s output untouched.
 
 **2. One explicit anti-default instruction**, directly informed by the
 CHEER-Ekman error analysis: tell the model not to read generic
-confident/professional phrasing as automatically positive, and to prefer
-SURPRISE over HAPPINESS when an answer is simply informationally dense
-without any actual emotional language — SURPRISE is the more neutral
-"noteworthy, not necessarily positive" reading for factual content with
-no emotional signal, whereas HAPPINESS/SADNESS both assert an emotional
-direction the text doesn't actually contain. This isn't inventing a new
-default so much as picking a less presumptuous one when there's truly no
-signal either way.
+confident/professional phrasing as automatically positive.
+
+**Implementation-time correction, from live testing (not caught at design
+time):** the first version of this instruction named a specific
+replacement — "prefer SURPRISE over defaulting to HAPPINESS" — reasoning
+that SURPRISE was a more neutral, less presumptuous read for factual
+content with no real emotional signal. Live testing across 6 bland
+answers showed this just swapped one deterministic bucket for another:
+5-6 of 6 landed on SURPRISE every time, at `temperature=0.8`, exactly the
+flat-variety problem this change was meant to fix. Removing the named
+replacement — keeping only "do not default to HAPPINESS just because an
+answer sounds competent or matter-of-fact," with no suggested
+alternative — restored genuine variety (HAPPINESS/SADNESS/FEAR/SURPRISE
+across repeated live runs on the same 6 answers, varying run to run at
+`temperature=0.8`, not converging on one bucket). Lesson for future
+prompt tuning in this codebase: naming a specific fallback emotion in an
+anti-bias instruction tends to just relocate the bias, not remove it.
 
 **3. Temperature `0.3` → `0.8`.** Mechanical variety lever, independent of
 the prompt changes. Non-deterministic: the same answer can classify
@@ -106,7 +115,7 @@ differently across runs. Explicitly acceptable per the stated goal
 (UX variety over reproducibility) — noting this so it's not later mistaken
 for a regression if two identical answers get different reactions.
 
-**New system prompt (replaces `_SYSTEM_PROMPT`):**
+**System prompt as shipped (replaces `_SYSTEM_PROMPT`):**
 
 ```python
 _SYSTEM_PROMPT = (
@@ -116,9 +125,8 @@ _SYSTEM_PROMPT = (
     "signals an emotion -- not the overall tone of a confident or "
     "professional-sounding answer, just what's actually there. Generic "
     "confident or professional phrasing on its own is not a signal of "
-    "happiness -- if an answer is simply factual with no real emotional "
-    "language, prefer SURPRISE (noteworthy, not positive or negative) "
-    "over defaulting to HAPPINESS.\n\n"
+    "happiness -- do not default to HAPPINESS just because an answer "
+    "sounds competent or matter-of-fact.\n\n"
     "Then pick exactly one of Ekman's core emotions that best fits: "
     "ANGER, CONTEMPT, DISGUST, FEAR, HAPPINESS, SADNESS, SURPRISE. "
     "Also rate its intensity from 1 (mild) to 3 (strong).\n\n"
