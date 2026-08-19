@@ -53,8 +53,8 @@ python -c "import evaluator; print(evaluator.evaluate('Tell me about yourself', 
 ```
 
 ```bash
-# Run the automated test suite (58 tests: schemas, guardrail, consistency,
-# evaluator, graph routing, emotion/robot-reaction bridge)
+# Run the automated test suite (67 tests: schemas, guardrail, consistency,
+# evaluator, graph routing, emotion classifier, robot-reaction bridge)
 pytest tests/ -v
 ```
 
@@ -91,7 +91,13 @@ persona answer -> evaluator -> schema guard (retry once on failure)
   readout, so an internally "inconsistent" pair (e.g. `BAD` + high valence)
   is allowed by design, not a bug. Takes an optional `retry_hint` string,
   used by `graph.py` to re-prompt with the Pydantic validation error when
-  the first response fails the schema guard.
+  the first response fails the schema guard. Its `valence`/`arousal` still
+  feed `EvaluatorOutputSchema` validation, `guardrail.check_consistency()`,
+  and `run_log.jsonl` — since `emotion_classifier.py` was introduced, they
+  no longer determine the robot's spoken reply or facial reaction, which
+  are driven by an independently classified emotion instead. The two
+  valence signals can diverge; both are logged, and that divergence is
+  intentional, not a bug.
 - **`schemas.py`** — `EvaluatorOutputSchema` (Pydantic) validates the
   evaluator's JSON before it's trusted downstream (category/VA enum values,
   `confidence` in [0,1], non-empty rationale). `Category`/`VALevel` are
@@ -112,12 +118,19 @@ persona answer -> evaluator -> schema guard (retry once on failure)
   (`config.va_cells()`). Backed by `data/response_bank_seed.json`
   (placeholder Hebrew data, 9 cells) — swap the seed file without touching
   the module's API.
-- **`emotion_bank.py`** — companion to `response_bank.py`: same
-  `(valence, arousal)` input, same 3×3-grid pattern, but returns a Furhat
-  facial emotion + intensity (`data/emotion_bank_seed.json`) instead of
-  reply text. Deliberately reads the *same* VA pair as the text reply
-  rather than a second, independent judgment, so the robot's face and
-  spoken reply can never contradict each other.
+- **`emotion_classifier.py`** — `classify_emotion(question, answer_text)`,
+  one LLM call, independent of `evaluator.py` (no shared prompt, no shared
+  code — sees only the question and answer text). Picks freely among all
+  7 of Ekman's core emotions (Anger, Contempt, Disgust, Fear, Happiness,
+  Sadness, Surprise) plus an intensity 1-3. `derive_valence()` and
+  `derive_arousal()` then turn that pick into a `(valence, arousal)` pair
+  for `response_bank.py`'s spoken reply — valence from a fixed
+  emotion→valence table, arousal from intensity — so the robot's face
+  (the classified emotion) and spoken reply (the derived-VA text) both
+  trace back to the same classification call and can never contradict
+  each other. This is "emotion-first": the reverse of the earlier
+  VA-first `emotion_bank.py` mechanism it replaces. See
+  `docs/superpowers/specs/2026-08-16-emotion-first-classification-design.md`.
 - **`robot_bridge.py`** — `send_reaction(emotion, intensity, text)` POSTs
   to `furhat-emotion-study`'s local HTTP bridge (a separate Kotlin repo,
   `localhost:8765/react` by default) so the robot shows the matching face
