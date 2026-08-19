@@ -7,8 +7,8 @@ LangGraph wiring for the Conversation Engine pipeline (Day 1 step 4):
 
 Every run appends one line to data/run_log.jsonl regardless of routing.
 Wires together personas.py, evaluator.py, guardrail.py, response_bank.py,
-emotion_bank.py, robot_bridge.py, and review_queue.py without modifying
-their internals.
+emotion_classifier.py, robot_bridge.py, and review_queue.py without
+modifying their internals.
 """
 
 import json
@@ -26,7 +26,7 @@ import review_queue
 import robot_bridge
 from pydantic import ValidationError
 from response_bank import ResponseBank
-from emotion_bank import EmotionBank
+import emotion_classifier
 from schemas import EvaluatorOutputSchema
 
 
@@ -39,13 +39,12 @@ class ConversationState(TypedDict, total=False):
     guardrail_result: dict    # passed, matched_patterns, style_leakage_score
     consistency: dict         # consistent, note — from guardrail.check_consistency()
     final_response: Optional[str]
-    emotion_reaction: dict    # emotion, intensity — from emotion_bank.get(), always computed
+    emotion_reaction: dict    # emotion, intensity — from emotion_classifier.classify_emotion(), always computed
     robot_reaction: dict      # sent, reason — from robot_bridge.send_reaction()
     routed_to: str            # "review_queue" or "finalized"
 
 
 _response_bank = ResponseBank()
-_emotion_bank = EmotionBank()
 
 
 def generate_answer(state: ConversationState) -> dict:
@@ -152,14 +151,13 @@ def _build_review_reason(state: ConversationState) -> str:
 
 
 def select_response(state: ConversationState) -> dict:
-    ev = state["evaluation"]
-    response = _response_bank.get(ev["valence"], ev["arousal"])
-
-    reaction = _emotion_bank.get(
-        ev["valence"], ev["arousal"],
-        question=state.get("question"), answer_text=state.get("answer_text"),
-        rationale=ev.get("rationale"),
+    reaction = emotion_classifier.classify_emotion(
+        question=state.get("question"), answer_text=state.get("answer_text")
     )
+    derived_valence = emotion_classifier.derive_valence(reaction["emotion"])
+    derived_arousal = emotion_classifier.derive_arousal(reaction["intensity"])
+    response = _response_bank.get(derived_valence, derived_arousal)
+
     robot_reaction = robot_bridge.send_reaction(reaction["emotion"], reaction["intensity"], text=response)
 
     return {
