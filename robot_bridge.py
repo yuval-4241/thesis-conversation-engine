@@ -1,5 +1,5 @@
 """
-Robot Reaction Bridge — sends emotion_bank's (emotion, intensity) pick,
+Robot Reaction Bridge — sends emotion_classifier's (emotion, intensity) pick,
 plus response_bank's spoken reply text, to furhat-emotion-study's
 RemoteControl HTTP endpoint (a separate Kotlin repo), so the
 physical/virtual robot shows a matching facial expression while actually
